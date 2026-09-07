@@ -38,6 +38,24 @@
     <properties>
         <release.package>release-package-ignite-performance-statistics</release.package>
         <tool.directory>performance-statistics-tool</tool.directory>
+
+        <!--
+            Third-party UI libraries of the report are not stored in the source tree. They are taken on build from
+            the WebJars artifacts of the npm packages, which are unpacked into the report directory. To update a
+            library, change its version below and check that the files listed in the maven-antrun-plugin
+            configuration are still provided by the artifact.
+        -->
+        <report.dir>${project.build.directory}/report</report.dir>
+        <web.libs.dir>${project.build.directory}/web-libs</web.libs.dir>
+        <webjars.dir>${web.libs.dir}/META-INF/resources/webjars</webjars.dir>
+
+        <bootstrap.version>5.3.8</bootstrap.version>
+        <bootstrap-table.version>1.27.3</bootstrap-table.version>
+        <use-bootstrap-select.version>2.2.1</use-bootstrap-select.version>
+        <chartjs.version>2.9.4</chartjs.version>
+        <jquery.version>4.0.0</jquery.version>
+        <moment.version>2.30.1</moment.version>
+        <fontawesome.version>5.15.4</fontawesome.version>
     </properties>
 
     <dependencies>
@@ -104,12 +122,37 @@
                 <version>1.8</version>
                 <executions>
                     <execution>
-                        <!-- Builds archive with UI resources. -->
+                        <!-- Assembles UI resources with the unpacked libraries and builds archive with them. -->
                         <phase>compile</phase>
                         <configuration>
                             <target>
-                                <zip destfile="${basedir}/target/report.zip" encoding="UTF-8">
-                                    <zipfileset dir="${basedir}/report"/>
+                                <delete dir="${report.dir}"/>
+
+                                <copy todir="${report.dir}">
+                                    <fileset dir="${basedir}/report"/>
+                                </copy>
+
+                                <copy todir="${report.dir}/libs" flatten="true">
+                                    <fileset file="${webjars.dir}/bootstrap/${bootstrap.version}/dist/css/bootstrap.min.css"/>
+                                    <fileset file="${webjars.dir}/bootstrap/${bootstrap.version}/dist/js/bootstrap.bundle.min.js"/>
+                                    <fileset file="${webjars.dir}/bootstrap-table/${bootstrap-table.version}/dist/bootstrap-table.min.css"/>
+                                    <fileset file="${webjars.dir}/bootstrap-table/${bootstrap-table.version}/dist/bootstrap-table.min.js"/>
+                                    <fileset file="${webjars.dir}/use-bootstrap-select/${use-bootstrap-select.version}/dist/use-bootstrap-select.min.css"/>
+                                    <fileset file="${webjars.dir}/use-bootstrap-select/${use-bootstrap-select.version}/dist/use-bootstrap-select.min.js"/>
+                                    <fileset file="${webjars.dir}/chart.js/${chartjs.version}/dist/Chart.min.js"/>
+                                    <fileset file="${webjars.dir}/jquery/${jquery.version}/dist/jquery.min.js"/>
+                                    <fileset file="${webjars.dir}/moment/${moment.version}/min/moment.min.js"/>
+                                </copy>
+
+                                <copy todir="${report.dir}/libs/fontawesome">
+                                    <fileset dir="${webjars.dir}/fortawesome__fontawesome-free/${fontawesome.version}">
+                                        <include name="css/all.min.css"/>
+                                        <include name="webfonts/fa-solid-900.*"/>
+                                    </fileset>
+                                </copy>
+
+                                <zip destfile="${project.build.outputDirectory}/report.zip" encoding="UTF-8">
+                                    <zipfileset dir="${report.dir}"/>
                                 </zip>
                             </target>
                         </configuration>
@@ -120,33 +163,68 @@
                 </executions>
             </plugin>
             <plugin>
-                <artifactId>maven-resources-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <!-- Includes zip archive with UI resources to module resources. -->
-                        <id>copy-resources</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${project.build.outputDirectory}</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>${basedir}/target</directory>
-                                    <includes>
-                                        <include>report.zip</include>
-                                    </includes>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
+                    <execution>
+                        <!--
+                            Unpacks third-party UI libraries of the report. The libraries are referenced as artifact
+                            items rather than as project dependencies to keep them off the project classpath and to
+                            avoid resolving their transitive dependencies, some of which are declared with version
+                            ranges (see the 'chart.js' package).
+                        -->
+                        <id>unpack-report-libs</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${web.libs.dir}</outputDirectory>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>bootstrap</artifactId>
+                                    <version>${bootstrap.version}</version>
+                                    <includes>**/dist/css/bootstrap.min.css,**/dist/js/bootstrap.bundle.min.js</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>bootstrap-table</artifactId>
+                                    <version>${bootstrap-table.version}</version>
+                                    <includes>**/dist/bootstrap-table.min.css,**/dist/bootstrap-table.min.js</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>use-bootstrap-select</artifactId>
+                                    <version>${use-bootstrap-select.version}</version>
+                                    <includes>**/dist/use-bootstrap-select.min.css,**/dist/use-bootstrap-select.min.js</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>chart.js</artifactId>
+                                    <version>${chartjs.version}</version>
+                                    <includes>**/dist/Chart.min.js</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>jquery</artifactId>
+                                    <version>${jquery.version}</version>
+                                    <includes>**/dist/jquery.min.js</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>moment</artifactId>
+                                    <version>${moment.version}</version>
+                                    <includes>**/min/moment.min.js</includes>
+                                </artifactItem>
+                                <artifactItem>
+                                    <groupId>org.webjars.npm</groupId>
+                                    <artifactId>fortawesome__fontawesome-free</artifactId>
+                                    <version>${fontawesome.version}</version>
+                                    <includes>**/css/all.min.css,**/webfonts/fa-solid-900.*</includes>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
                     <execution>
                         <!-- Copy tool's dependencies. -->
                         <phase>prepare-package</phase>
